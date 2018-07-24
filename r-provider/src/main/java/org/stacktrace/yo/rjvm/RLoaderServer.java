@@ -1,25 +1,51 @@
 package org.stacktrace.yo.rjvm;
 
+import io.netty.bootstrap.ServerBootstrap;
+import io.netty.channel.EventLoopGroup;
+import io.netty.channel.nio.NioEventLoopGroup;
+import io.netty.channel.socket.nio.NioServerSocketChannel;
+import io.netty.handler.logging.LogLevel;
+import io.netty.handler.logging.LoggingHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.stacktrace.yo.rjvm.provider.RemoteClassProvider;
+import org.stacktrace.yo.rjvm.channel.RloaderChannelInitializer;
+import org.stacktrace.yo.rjvm.config.RloaderServerConfig;
 
-import java.net.InetSocketAddress;
+public class RLoaderServer {
 
-public class ClassLoaderServer {
 
-    private final RemoteClassProvider myClassProvider;
+    private static final Logger myLogger = LoggerFactory.getLogger(RLoaderServer.class.getSimpleName());
+    private final EventLoopGroup myServerGroup;
+    private final EventLoopGroup myWorkerLoopGroup;
+    private final ServerBootstrap myServer;
+    private final RloaderServerConfig myConfig;
 
-    private static final Logger myLogger = LoggerFactory.getLogger(ClassLoaderServer.class.getSimpleName());
-
-    public ClassLoaderServer(InetSocketAddress address) {
-//        super(address);
-        myClassProvider = new RemoteClassProvider();
+    public RLoaderServer(RloaderServerConfig config) {
+        myConfig = config;
+        myServerGroup = new NioEventLoopGroup(
+                config.getNumOfThreads()
+        );
+        myWorkerLoopGroup = new NioEventLoopGroup();
+        myServer = new ServerBootstrap()
+                .group(myServerGroup, myWorkerLoopGroup)
+                .channel(NioServerSocketChannel.class)
+                .handler(new LoggingHandler(LogLevel.INFO))
+                .childHandler(new RloaderChannelInitializer());
     }
 
-    public ClassLoaderServer(Integer port) {
-        this(new InetSocketAddress(port));
+    public void run() throws InterruptedException {
+        try {
+            myServer.bind(myConfig.getAddress())
+                    .sync()
+                    .channel()
+                    .closeFuture()
+                    .sync();
+        } finally {
+            myServerGroup.shutdownGracefully();
+            myWorkerLoopGroup.shutdownGracefully();
+        }
     }
+
 
 //    @Override
 //    public void onStart() {

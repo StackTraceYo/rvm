@@ -1,16 +1,19 @@
 package org.stacktrace.yo.rjvm;
 
-public class RLoaderRunner {
+import org.stacktrace.yo.rjvm.config.RloaderServerConfig;
 
-    private final ClassLoaderServer myServer;
+public final class RLoaderRunner {
 
-    public RLoaderRunner() {
-        myServer = new ClassLoaderServer(8889);
-//        myServer.start();
-    }
+    static final int PORT = Integer.parseInt(System.getProperty("port", "8889"));
 
-    public static void main(String... args) {
-        RLoaderRunner loader = new RLoaderRunner();
+    public static void main(String[] args) throws Exception {
+        final RLoaderServer myServer = new RLoaderServer(
+                RloaderServerConfig.builder()
+                        .setPort(PORT)
+                        .setNumOfThreads(5)
+                        .build()
+        );
+        myServer.run();
     }
 
 }

@@ -2,13 +2,15 @@ package org.stacktrace.yo.rjvm.loader;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.stacktrace.yo.rjvm.client.RloaderClient;
+import org.stacktrace.yo.rjvm.client.config.RLoaderClientConfig;
 
 import java.net.URI;
 import java.net.URISyntaxException;
 
 public class RemoteClassLoader extends ClassLoader {
     private static final Logger myLogger = LoggerFactory.getLogger(RemoteClassLoader.class.getSimpleName());
-//    private final ClassLoaderClient myClient;
+    private final RloaderClient myClient;
 
     public RemoteClassLoader(URI serverUri) {
         this(serverUri, Thread.currentThread().getContextClassLoader());
@@ -16,8 +18,11 @@ public class RemoteClassLoader extends ClassLoader {
 
     public RemoteClassLoader(URI serverUri, ClassLoader parent) {
         super(parent);
-//        myClient = new ClassLoaderClient(serverUri, this);
-//        myClient.connect();
+        myClient = new RloaderClient(RLoaderClientConfig.builder()
+                .withHost(serverUri.getHost())
+                .withPort(serverUri.getPort())
+                .build()
+        );
     }
 
 //    @Override
