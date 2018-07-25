@@ -8,9 +8,11 @@ import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.stacktrace.yo.proto.rloader.RLoader;
 import org.stacktrace.yo.rjvm.client.channel.RLoaderClientHandler;
 import org.stacktrace.yo.rjvm.client.config.RLoaderClientConfig;
 
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class RloaderClient {
@@ -19,7 +21,6 @@ public class RloaderClient {
     private final AtomicBoolean connected = new AtomicBoolean(false);
     private final RLoaderClientConfig myConfig;
     private EventLoopGroup myEventGroup;
-    private Bootstrap myServer;
     private Channel myConnectedChannel;
     private ChannelFuture myLastWrite;
     private RLoaderClientHandler myHandler;
@@ -28,11 +29,17 @@ public class RloaderClient {
         myConfig = config;
     }
 
-    public RloaderClient connect() throws Exception {
+    public RLoader.RLoaderResponse requestClass(RLoader.LoadClass classReq) throws InterruptedException, ExecutionException {
+        return myHandler.requestClass(classReq)
+                .sync()
+                .get();
+    }
+
+    public RloaderClient connect() throws InterruptedException {
         if (!connected.get()) {
             myHandler = new RLoaderClientHandler();
             myEventGroup = new NioEventLoopGroup();
-            myServer = new Bootstrap();
+            Bootstrap myServer = new Bootstrap();
             myServer.group(myEventGroup)
                     .channel(NioSocketChannel.class)
                     .handler(myHandler);

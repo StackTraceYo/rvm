@@ -24,14 +24,11 @@ public class RemoteClassProvider {
         try {
             InputStream resourceStream = loader.getResourceAsStream(resourceName);
             byte[] resourceBytes = ByteStreams.toByteArray(resourceStream);
-            byte[] hash = Hash.defaultFastHash()
-                    .putBytes(resourceBytes)
-                    .hash()
-                    .asBytes();
+            String hash = Hash.defaultFastHash(resourceBytes);
             return RLoader.ClassLoaded.newBuilder()
                     .setId(id)
                     .setResource(ByteString.copyFrom(resourceBytes))
-                    .setHash(ByteString.copyFrom(hash))
+                    .setHash(hash)
                     .build();
 
         } catch (IOException e) {

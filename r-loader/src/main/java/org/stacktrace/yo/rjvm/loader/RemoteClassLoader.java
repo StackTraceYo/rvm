@@ -1,9 +1,12 @@
 package org.stacktrace.yo.rjvm.loader;
 
+import com.google.protobuf.ByteString;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.stacktrace.yo.proto.rloader.RLoader;
 import org.stacktrace.yo.rjvm.client.RloaderClient;
 import org.stacktrace.yo.rjvm.client.config.RLoaderClientConfig;
+import org.stacktrace.yo.rjvm.utils.Hash;
 
 import java.net.URI;
 import java.net.URISyntaxException;
@@ -23,34 +26,11 @@ public class RemoteClassLoader extends ClassLoader {
                 .withPort(serverUri.getPort())
                 .build()
         );
+        try {
+            myClient.connect();
+        } catch (InterruptedException e) {
+        }
     }
-
-//    @Override
-//    public Consumer<Void> onOpen() {
-//        return aVoid -> myLogger.debug("[RemoteClassLoader] Opened");
-//    }
-//
-//
-//    @Override
-//    public Consumer<ByteBuffer> onMessage() {
-//        return byteBuffer -> {
-//            try {
-//                RLoader.RLoaderMessage message = RLoader.RLoaderMessage
-//                        .parseFrom(byteBuffer);
-//                RLoader.RLoaderMessage.MessageCase messageCase = message.getMessageCase();
-//                myLogger.debug(messageCase.toString());
-//                switch (messageCase) {
-//                    case CONNECTED:
-//                        RLoader.ConnectionRecieved connectionRecieved = message.getConnected();
-//                        myLogger.debug(connectionRecieved.getId());
-//                    case CLASSLOADED:
-//
-//                }
-//            } catch (Exception e) {
-//                myLogger.error("[RemoteClassLoader] Error: ", e);
-//            }
-//        };
-//    }
 
     @Override
     public Class<?> loadClass(String name) throws ClassNotFoundException {
@@ -59,18 +39,51 @@ public class RemoteClassLoader extends ClassLoader {
 
     @Override
     protected Class<?> findClass(String name) throws ClassNotFoundException {
-        return super.findClass(name);
-    }
+        try {
+            RLoader.ClassLoaded response = myClient.requestClass(
+                    RLoader.LoadClass.newBuilder()
+                            .setId("123")
+                            .setResource(name)
+                            .build()
+            )
+                    .getLoaded();
 
-//    @Override
-//    public Consumer<String> onClose() {
-//        return null;
-//    }
-//
-//    @Override
-//    public Consumer<Exception> onError() {
-//        return null;
-//    }
+            if (response.isInitialized()) {
+                final String hash = response.getHash();
+                final ByteString resource = response.getResource();
+                final byte[] bytes = resource.toByteArray();
+                if (bytes != null) {
+                    //check hash
+                    String checked = Hash.defaultFastHash(bytes);
+                    boolean eq = checked.equals(hash);
+                    if (eq) {
+                        int index = name.lastIndexOf(".");
+                        if (index > 0) {
+                            String packageName = name.substring(0, index);
+                            Package pkg = getPackage(packageName);
+                            if (pkg == null) {
+                                definePackage(packageName, null, null, null, null, null, null, null);
+                            }
+                        }
+                        return defineClass(name, resource.toByteArray(), 0, bytes.length);
+                    } else {
+                        // retry
+                        throw new ClassNotFoundException("Exception Loading Class" + name);
+                    }
+                } else {
+                    //retry
+                    throw new ClassNotFoundException("Exception Loading Class" + name);
+
+                }
+            } else {
+                //retry
+                throw new ClassNotFoundException("Exception Loading Class" + name);
+
+            }
+        } catch (Exception e) {
+            throw new ClassNotFoundException("Exception Loading Class" + name, e);
+        }
+    }
 
     public static void main(String... args) throws URISyntaxException {
         RemoteClassLoader x = new RemoteClassLoader(new URI("http://localhost:8889"));
